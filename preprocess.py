@@ -98,47 +98,41 @@ def preprocess(data):
     messages = re.split(pattern, data)[1:]
     dates = re.findall(pattern, data)
 
-    df = pd.DataFrame({'user_messages': messages,
-                       'message_date': dates})
+    df = pd.DataFrame({'user_messages': messages, 'message_date': dates})
 
-    df['message_date'] = df['message_date'].apply(
-        lambda text: gettimeanddate(text))
-    df.rename(columns={'message_date': 'date'}, inplace=True)
+    df['message_date'] = df['message_date'].apply(lambda text: gettimeanddate(text))
+    df.rename(columns={'message_date': 'Date'}, inplace=True)
 
-    users = []
-    messages = []
-
+    users, messages = [], []
     for message in df['user_messages']:
-
         entry = re.split('([\w\W]+?):\s', message)
         if entry[1:]:
             users.append(entry[1])
             messages.append(entry[2])
-
         else:
             users.append('Group Notification')
             messages.append(entry[0])
 
     df['User'] = users
-    df['message'] = messages
-
-    df['message'] = df['message'].apply(lambda text: getstring(text))
+    df['Message'] = [getstring(msg) for msg in messages]
 
     df = df.drop(['user_messages'], axis=1)
-    df = df[['message', 'date', 'User']]
+    df = df[['Message', 'Date', 'User']]
 
-    df = df.rename(columns={'message': 'Message',
-                            'date': 'Date'})
+    # Convert Date to datetime, with error handling
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
 
-    # Handle invalid dates
-    df['Date'] = df['Date'].fillna('2000-01-01')  # Optional: Replace NaN with default date
-    df['Only date'] = pd.to_datetime(df['Date'], errors='coerce').dt.date  # Handle invalid dates
-    df['Year'] = pd.to_datetime(df['Date'], errors='coerce').dt.year
-    df['Month_num'] = pd.to_datetime(df['Date'], errors='coerce').dt.month
-    df['Month'] = pd.to_datetime(df['Date'], errors='coerce').dt.month_name()
-    df['Day'] = pd.to_datetime(df['Date'], errors='coerce').dt.day
-    df['Day_name'] = pd.to_datetime(df['Date'], errors='coerce').dt.day_name()
-    df['Hour'] = pd.to_datetime(df['Date'], errors='coerce').dt.hour
-    df['Minute'] = pd.to_datetime(df['Date'], errors='coerce').dt.minute
+    # Add datetime components
+    df['Only date'] = df['Date'].dt.date
+    df['Year'] = df['Date'].dt.year
+    df['Month_num'] = df['Date'].dt.month
+    df['Month'] = df['Date'].dt.month_name()
+    df['Day'] = df['Date'].dt.day
+    df['Day_name'] = df['Date'].dt.day_name()
+    df['Hour'] = df['Date'].dt.hour
+    df['Minute'] = df['Date'].dt.minute
+
+    # Remove rows with NaT in 'Date'
+    df = df.dropna(subset=['Date'])
 
     return df
