@@ -94,18 +94,21 @@ def getstring(text):
 
 def preprocess(data):
 
-    pattern = '\d{1,2}/\d{1,2}/\d{2,4},\s\d{1,2}:\d{2}\s-\s'
+    pattern = r'\d{1,2}/\d{1,2}/\d{2,4},\s\d{1,2}:\d{2}\s-\s'
     messages = re.split(pattern, data)[1:]
     dates = re.findall(pattern, data)
 
+    # Create DataFrame
     df = pd.DataFrame({'user_messages': messages, 'message_date': dates})
 
+    # Apply custom date-time formatting
     df['message_date'] = df['message_date'].apply(lambda text: gettimeanddate(text))
     df.rename(columns={'message_date': 'Date'}, inplace=True)
 
+    # Separate users and messages
     users, messages = [], []
     for message in df['user_messages']:
-        entry = re.split('([\w\W]+?):\s', message)
+        entry = re.split(r'([\w\W]+?):\s', message)
         if entry[1:]:
             users.append(entry[1])
             messages.append(entry[2])
@@ -116,13 +119,22 @@ def preprocess(data):
     df['User'] = users
     df['Message'] = [getstring(msg) for msg in messages]
 
+    # Drop 'user_messages' and reorder
     df = df.drop(['user_messages'], axis=1)
     df = df[['Message', 'Date', 'User']]
 
-    # Convert Date to datetime, with error handling
-    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+    # Convert 'Date' to datetime, with error handling and logging
+    df['Date'] = pd.to_datetime(df['Date'], errors='coerce')  # Converts invalid dates to NaT
+    invalid_dates = df[df['Date'].isna()]  # Identify rows with NaT in 'Date'
 
-    # Add datetime components
+    # Debugging: Print invalid date rows (remove in production)
+    if not invalid_dates.empty:
+        print("Invalid date entries found and dropped:", invalid_dates)
+
+    # Drop rows with invalid 'Date'
+    df = df.dropna(subset=['Date'])
+
+    # Extract date components
     df['Only date'] = df['Date'].dt.date
     df['Year'] = df['Date'].dt.year
     df['Month_num'] = df['Date'].dt.month
@@ -131,8 +143,5 @@ def preprocess(data):
     df['Day_name'] = df['Date'].dt.day_name()
     df['Hour'] = df['Date'].dt.hour
     df['Minute'] = df['Date'].dt.minute
-
-    # Remove rows with NaT in 'Date'
-    df = df.dropna(subset=['Date'])
 
     return df
